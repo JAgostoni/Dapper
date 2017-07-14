@@ -84,6 +84,17 @@ namespace Dapper.Tests.Contrib
         public int Order { get; set; }
     }
 
+    [Table("TestTable")]
+    public class CreateTableTest
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int Order { get; set; }
+
+
+        // TODO: Full coverage on all supported types
+    }
+
     public abstract partial class TestSuite
     {
         protected static readonly bool IsAppVeyor = Environment.GetEnvironmentVariable("Appveyor")?.ToUpperInvariant() == "TRUE";
@@ -179,7 +190,7 @@ namespace Dapper.Tests.Contrib
 
                 var objectXs = connection.GetAll<ObjectX>().ToList();
                 objectXs.Count.IsMoreThan(0);
-                objectXs.Count(x => x.ObjectXId== guid).IsEqualTo(1);
+                objectXs.Count(x => x.ObjectXId == guid).IsEqualTo(1);
             }
         }
 
@@ -628,6 +639,23 @@ namespace Dapper.Tests.Contrib
                 connection.DeleteAll<User>().IsTrue();
                 connection.Get<User>(id1).IsNull();
                 connection.Get<User>(id2).IsNull();
+            }
+        }
+
+        [Fact]
+        public void CreateTable()
+        {
+            using (var connection = GetOpenConnection())
+            {
+                connection.TableExists<CreateTableTest>().IsFalse();
+
+                connection.CreateTable<CreateTableTest>().IsTrue();
+
+                connection.TableExists<CreateTableTest>().IsTrue();
+
+
+                // TODO: Insert and retrieve an object to ensure mapping was successful
+
             }
         }
     }

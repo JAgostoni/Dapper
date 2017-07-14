@@ -494,6 +494,94 @@ namespace Dapper.Contrib.Extensions
             return deleted > 0;
         }
 
+        public static bool TableExists<T>(this IDbConnection connection)
+        {
+            var tableName = GetTableName(typeof(T));
+
+            var existsQuery = $"select count(*) from sys.tables where Name='{tableName}' and type='U'"; // TODO: Def needs to come from adapter
+
+            var tableCount = connection.ExecuteScalar<int>(existsQuery);
+
+
+            return tableCount > 0;
+        }
+
+        public static bool CreateTable<T>(this IDbConnection connection)
+        {
+            var type = typeof(T);
+
+
+            var tableName = GetTableName(type);
+            var sbColumnList = new StringBuilder(null);
+            var allProperties = TypePropertiesCache(type);
+            var keyProperties = KeyPropertiesCache(type);
+            var computedProperties = ComputedPropertiesCache(type);
+            var allPropertiesExceptComputed = allProperties.Except(computedProperties).ToList();
+
+            var adapter = GetFormatter(connection);
+
+            StringBuilder createStatement = new StringBuilder();
+
+            createStatement.Append($"CREATE TABLE {tableName} "); // TODO: Get from ADAPTER(s)
+
+            if(allProperties.Count > 0)
+            {
+                createStatement.Append("("); // ANSI SQL Standard?
+
+        
+
+                // Add fields
+                for (var i = 0; i < allPropertiesExceptComputed.Count; i++)
+                {
+                    var prop = allPropertiesExceptComputed[i];
+
+                    // Get the db parameter type
+                    // TODO: Wrap this all in a field generator method in the SQL Adapter
+                    var paramTypeName = adapter.ParameterTypeMap[prop.PropertyType];
+                    var fieldName = "[" + prop.Name + "]";
+                    createStatement.Append($"{fieldName} {paramTypeName}");
+
+                    // Special handling for id field
+                    if(prop.Name.ToLower() == "id") // TODO: Is there a more formal Dapper way?
+                    {
+                        createStatement.Append(" IDENTITY "); // TODO: This is SQL only, move to adapter
+                    }
+
+                    createStatement.Append(", ");
+
+                }
+
+                // Add constraints
+                createStatement.Append("PRIMARY KEY (");
+
+                for (int i = 0; i < keyProperties.Count; i++)
+                {
+                    createStatement.Append(keyProperties[i].Name);
+                    if(i < keyProperties.Count - 1)
+                    {
+                        createStatement.Append(", ");
+                    }
+                }
+
+                createStatement.Append(" )) ");
+
+                
+                var wasClosed = connection.State == ConnectionState.Closed;
+                if (wasClosed) connection.Open();
+
+                connection.Execute(createStatement.ToString());
+
+                if (wasClosed) connection.Close();
+
+                return true;
+
+            }
+
+
+
+            return false; // Nothing to create
+        }
+
         /// <summary>
         /// Specifies a custom callback that detects the database type instead of relying on the default strategy (the name of the connection type object).
         /// Please note that this callback is global and will be used by all the calls that require a database specific adapter.
@@ -759,6 +847,11 @@ public partial interface ISqlAdapter
     /// <param name="sb">The string builder  to append to.</param>
     /// <param name="columnName">The column name.</param>
     void AppendColumnNameEqualsValue(StringBuilder sb, string columnName);
+
+    /// <summary>
+    /// Maps .NET type to SQL statement parameter type
+    /// </summary>
+    Dictionary<Type, string> ParameterTypeMap { get; }     
 }
 
 /// <summary>
@@ -766,6 +859,16 @@ public partial interface ISqlAdapter
 /// </summary>
 public partial class SqlServerAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap =>
+        new Dictionary<Type, string>()
+        {
+            // TODO Complete map based on: https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-data-type-mappings
+            { typeof(bool), "bit" },
+            { typeof(string), "nvarchar(MAX)" },
+            { typeof(int), "int" }
+
+        };
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -822,6 +925,8 @@ public partial class SqlServerAdapter : ISqlAdapter
 /// </summary>
 public partial class SqlCeServerAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -878,6 +983,8 @@ public partial class SqlCeServerAdapter : ISqlAdapter
 /// </summary>
 public partial class MySqlAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -933,6 +1040,8 @@ public partial class MySqlAdapter : ISqlAdapter
 /// </summary>
 public partial class PostgresAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -1009,6 +1118,8 @@ public partial class PostgresAdapter : ISqlAdapter
 /// </summary>
 public partial class SQLiteAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -1062,6 +1173,8 @@ public partial class SQLiteAdapter : ISqlAdapter
 /// </summary>
 public partial class FbAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
