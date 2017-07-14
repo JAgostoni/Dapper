@@ -522,13 +522,11 @@ namespace Dapper.Contrib.Extensions
 
             StringBuilder createStatement = new StringBuilder();
 
-            createStatement.Append($"CREATE TABLE {tableName} "); // TODO: Get from ADAPTER(s)
+            createStatement.Append($"CREATE TABLE {tableName} ");
 
             if(allProperties.Count > 0)
             {
-                createStatement.Append("("); // ANSI SQL Standard?
-
-        
+                createStatement.Append("("); // TODO: ANSI SQL Standard for create table?
 
                 // Add fields
                 for (var i = 0; i < allPropertiesExceptComputed.Count; i++)
@@ -536,15 +534,14 @@ namespace Dapper.Contrib.Extensions
                     var prop = allPropertiesExceptComputed[i];
 
                     // Get the db parameter type
-                    // TODO: Wrap this all in a field generator method in the SQL Adapter
                     var paramTypeName = adapter.ParameterTypeMap[prop.PropertyType];
-                    var fieldName = "[" + prop.Name + "]";
+                    var fieldName = adapter.FormatFieldName(prop.Name);
                     createStatement.Append($"{fieldName} {paramTypeName}");
 
                     // Special handling for id field
-                    if(prop.Name.ToLower() == "id") // TODO: Is there a more formal Dapper way?
+                    if(prop.Name.ToLower() == "id") 
                     {
-                        createStatement.Append(" IDENTITY "); // TODO: This is SQL only, move to adapter
+                        createStatement.Append(adapter.AutoIncrementModifier());
                     }
 
                     createStatement.Append(", ");
@@ -851,7 +848,13 @@ public partial interface ISqlAdapter
     /// <summary>
     /// Maps .NET type to SQL statement parameter type
     /// </summary>
-    Dictionary<Type, string> ParameterTypeMap { get; }     
+    Dictionary<Type, string> ParameterTypeMap { get; }
+
+    string AutoIncrementModifier();
+
+    string FormatFieldName(string propertyName);
+
+
 }
 
 /// <summary>
@@ -918,6 +921,16 @@ public partial class SqlServerAdapter : ISqlAdapter
     {
         sb.AppendFormat("[{0}] = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        return " IDENTITY ";
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        return "[" + propertyName + "]";
+    }
 }
 
 /// <summary>
@@ -976,6 +989,16 @@ public partial class SqlCeServerAdapter : ISqlAdapter
     {
         sb.AppendFormat("[{0}] = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -1032,6 +1055,16 @@ public partial class MySqlAdapter : ISqlAdapter
     public void AppendColumnNameEqualsValue(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("`{0}` = @{1}", columnName, columnName);
+    }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
     }
 }
 
@@ -1111,6 +1144,16 @@ public partial class PostgresAdapter : ISqlAdapter
     {
         sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -1165,6 +1208,16 @@ public partial class SQLiteAdapter : ISqlAdapter
     public void AppendColumnNameEqualsValue(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
+    }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
     }
 }
 
@@ -1224,5 +1277,15 @@ public partial class FbAdapter : ISqlAdapter
     public void AppendColumnNameEqualsValue(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("{0} = @{1}", columnName, columnName);
+    }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
     }
 }
