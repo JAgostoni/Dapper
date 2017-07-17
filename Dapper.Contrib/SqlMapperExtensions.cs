@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Text;
 using System.Collections.Concurrent;
 using System.Reflection.Emit;
-using System.Xml;
 
 using Dapper;
 
@@ -494,15 +493,20 @@ namespace Dapper.Contrib.Extensions
             var deleted = connection.Execute(statement, null, transaction, commandTimeout);
             return deleted > 0;
         }
-
+        /// <summary>
+        /// 
+        /// Checks whether the table exists in the database.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="connection"></param>
+        /// <returns>Returns true if the table exists, false if not.</returns>
         public static bool TableExists<T>(this IDbConnection connection)
         {
 
             var adapter = GetFormatter(connection);
             var tableName = GetTableName(typeof(T));
 
-            //var existsQuery = $"select count(*) from sys.tables where Name='{tableName}' and type='U'"; // TODO: Def needs to come from adapter
-            var existsQuery = adapter.GetQuery(tableName);
+            var existsQuery = adapter.GetTableExistsQuery(tableName);
 
             var tableCount = connection.ExecuteScalar<int>(existsQuery);
 
@@ -515,14 +519,13 @@ namespace Dapper.Contrib.Extensions
         /// </summary>
         /// <typeparam name="T">Type of entity</typeparam>
         /// <param name="connection">Open SqlConnection</param>
-        /// <returns>Returns true if successfull, false if not</returns>
+        /// <returns>Returns true if successful, false if not</returns>
         public static bool CreateTable<T>(this IDbConnection connection)
         {
             var type = typeof(T);
 
 
             var tableName = GetTableName(type);
-            var sbColumnList = new StringBuilder(null);
             var allProperties = TypePropertiesCache(type);
             var keyProperties = KeyPropertiesCache(type);
             var computedProperties = ComputedPropertiesCache(type);
@@ -536,8 +539,7 @@ namespace Dapper.Contrib.Extensions
 
             if(allProperties.Count > 0)
             {
-                createStatement.Append("("); // TODO: ANSI SQL Standard for create table?
-                //All follow the ANSI SQL Standard except Firebase
+                createStatement.Append("("); 
 
                 // Add fields
                 for (var i = 0; i < allPropertiesExceptComputed.Count; i++)
@@ -861,10 +863,25 @@ public partial interface ISqlAdapter
     /// </summary>
     Dictionary<Type, string> ParameterTypeMap { get; }
 
+    /// <summary>
+    /// Implements Identity Insert/Auto Increment depending on database connection
+    /// </summary>
+    /// <returns>The keyword to turn on id identity insert/auto increment </returns>
     string AutoIncrementModifier();
 
+    /// <summary>
+    /// Formats field name properly to avoid issues with database type syntax
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>Returns an acceptable field name for the database</returns>
     string FormatFieldName(string propertyName);
-    string GetQuery(string tableName);
+
+    /// <summary>
+    /// Gets a query to check whether the table exists in the database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>A string query </returns>
+    string GetTableExistsQuery(string tableName);
 }
 
 /// <summary>
@@ -872,10 +889,12 @@ public partial interface ISqlAdapter
 /// </summary>
 public partial class SqlServerAdapter : ISqlAdapter
 {
+    /// <summary>
+    /// Property Type Mapping based on https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-data-type-mappings
+    /// </summary>
     public Dictionary<Type, string> ParameterTypeMap =>
         new Dictionary<Type, string>()
         {
-            // TODO Complete map based on: https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-data-type-mappings
             { typeof(Boolean), "bit" },
             { typeof(String), "nvarchar(MAX)" },
             { typeof(Int32), "int" },
@@ -942,17 +961,31 @@ public partial class SqlServerAdapter : ISqlAdapter
         sb.AppendFormat("[{0}] = @{1}", columnName, columnName);
     }
 
+    /// <summary>
+    /// Implements SQL Server Indentity Insert for the id field
+    /// </summary>
+    /// <returns>The string to be added for Identity Insert</returns>
     public string AutoIncrementModifier()
     {
         return " IDENTITY ";
     }
 
+    /// <summary>
+    /// Formats field name to avoid delimiter issues in SQL Server
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>Returns SQL Server accepted field name</returns>
     public string FormatFieldName(string propertyName)
     {
         return "[" + propertyName + "]";
     }
 
-    public string GetQuery(string tableName)
+    /// <summary>
+    /// Gets the query to test whether the table exists in the SQL Server database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>A string with the SQL Query</returns>
+    public string GetTableExistsQuery(string tableName)
     {
         return $"select count(*) from sys.tables where Name='{tableName}' and type='U'";
     }
@@ -963,6 +996,9 @@ public partial class SqlServerAdapter : ISqlAdapter
 /// </summary>
 public partial class SqlCeServerAdapter : ISqlAdapter
 {
+    /// <summary>
+    /// Unimplemented property type mapping
+    /// </summary>
     public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
 
     /// <summary>
@@ -1015,16 +1051,31 @@ public partial class SqlCeServerAdapter : ISqlAdapter
         sb.AppendFormat("[{0}] = @{1}", columnName, columnName);
     }
 
+    /// <summary>
+    /// Unimplemented version of SQL CE Server's Identity Insert on the id field
+    /// </summary>
+    /// <returns></returns>
     public string AutoIncrementModifier()
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Unimplement method formats field name to avoid delimiter issues in SQL CE Server
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>NotImplemenetedException</returns>
     public string FormatFieldName(string propertyName)
     {
         throw new NotImplementedException();
     }
-    public string GetQuery(string tableName)
+
+    /// <summary>
+    /// Gets the query to test whether the table exists in the SQL CE Server database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>NotImplementedException</returns>
+    public string GetTableExistsQuery(string tableName)
     {
         throw new NotImplementedException();
     }
@@ -1035,6 +1086,9 @@ public partial class SqlCeServerAdapter : ISqlAdapter
 /// </summary>
 public partial class MySqlAdapter : ISqlAdapter
 {
+    /// <summary>
+    /// Unimplemented property type mapping
+    /// </summary>
     public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
 
     /// <summary>
@@ -1086,16 +1140,31 @@ public partial class MySqlAdapter : ISqlAdapter
         sb.AppendFormat("`{0}` = @{1}", columnName, columnName);
     }
 
+    /// <summary>
+    /// Unimplemented version of MySql's Auto Increment on the id field
+    /// </summary>
+    /// <returns></returns>
     public string AutoIncrementModifier()
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Unimplement method formats field name to avoid delimiter issues in MySql
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>NotImplementedException</returns>
     public string FormatFieldName(string propertyName)
     {
         throw new NotImplementedException();
     }
-    public string GetQuery(string tableName)
+
+    /// <summary>
+    /// Gets the query to test whether the table exists in the MySql database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>NotImplementedException</returns>
+    public string GetTableExistsQuery(string tableName)
     {
         throw new NotImplementedException();
     }
@@ -1106,6 +1175,9 @@ public partial class MySqlAdapter : ISqlAdapter
 /// </summary>
 public partial class PostgresAdapter : ISqlAdapter
 {
+    /// <summary>
+    /// Unimplemented property type mapping
+    /// </summary>
     public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
 
     /// <summary>
@@ -1178,16 +1250,31 @@ public partial class PostgresAdapter : ISqlAdapter
         sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
     }
 
+    /// <summary>
+    /// Unimplemented version of Postgres' Auto Increment on the id field
+    /// </summary>
+    /// <returns>NotImplementedException</returns>
     public string AutoIncrementModifier()
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Unimplement method formats field name to avoid delimiter issues in Postgres
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>NotImplementedException</returns>
     public string FormatFieldName(string propertyName)
     {
         throw new NotImplementedException();
     }
-    public string GetQuery(string tableName)
+
+    /// <summary>
+    /// Gets the query to test whether the table exists in the Postgres database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>NotImplementedException</returns>
+    public string GetTableExistsQuery(string tableName)
     {
         throw new NotImplementedException();
     }
@@ -1198,6 +1285,9 @@ public partial class PostgresAdapter : ISqlAdapter
 /// </summary>
 public partial class SQLiteAdapter : ISqlAdapter
 {
+    /// <summary>
+    /// Unimplemented property type mapping
+    /// </summary>
     public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
 
     /// <summary>
@@ -1247,16 +1337,30 @@ public partial class SQLiteAdapter : ISqlAdapter
         sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
     }
 
+    /// <summary>
+    /// Unimplemented version of SQL Lite's Auto Increment on the id field
+    /// </summary>
+    /// <returns></returns>
     public string AutoIncrementModifier()
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Unimplement method formats field name to avoid delimiter issues in SQL Lite
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>NotImplementedException</returns>
     public string FormatFieldName(string propertyName)
     {
         throw new NotImplementedException();
     }
-    public string GetQuery(string tableName)
+    /// <summary>
+    /// Gets the query to test whether the table exists in the SQL Lite database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>NotImplementedException</returns>
+    public string GetTableExistsQuery(string tableName)
     {
         throw new NotImplementedException();
     }
@@ -1267,6 +1371,9 @@ public partial class SQLiteAdapter : ISqlAdapter
 /// </summary>
 public partial class FbAdapter : ISqlAdapter
 {
+    /// <summary>
+    /// Unimplemented property type mapping
+    /// </summary>
     public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
 
     /// <summary>
@@ -1320,16 +1427,32 @@ public partial class FbAdapter : ISqlAdapter
         sb.AppendFormat("{0} = @{1}", columnName, columnName);
     }
 
+
+    /// <summary>
+    /// Unimplemented version of Firebase's Identity Insert on the id field.
+    /// </summary>
+    /// <returns> NotImplementedException </returns>
     public string AutoIncrementModifier()
     {
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Unimplement method formats field name to avoid delimiter issues in Firebase
+    /// </summary>
+    /// <param name="propertyName"></param>
+    /// <returns>NotImplementedException</returns>
     public string FormatFieldName(string propertyName)
     {
         throw new NotImplementedException();
     }
-    public string GetQuery(string tableName)
+
+    /// <summary>
+    /// Gets the query to test whether the table exists in the Firebase database
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <returns>NotImplementedException</returns>
+    public string GetTableExistsQuery(string tableName)
     {
         throw new NotImplementedException();
     }
