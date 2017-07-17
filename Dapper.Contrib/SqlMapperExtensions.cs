@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Collections.Concurrent;
 using System.Reflection.Emit;
+using System.Xml;
 
 using Dapper;
 
@@ -494,6 +495,101 @@ namespace Dapper.Contrib.Extensions
             return deleted > 0;
         }
 
+        public static bool TableExists<T>(this IDbConnection connection)
+        {
+
+            var adapter = GetFormatter(connection);
+            var tableName = GetTableName(typeof(T));
+
+            //var existsQuery = $"select count(*) from sys.tables where Name='{tableName}' and type='U'"; // TODO: Def needs to come from adapter
+            var existsQuery = adapter.GetQuery(tableName);
+
+            var tableCount = connection.ExecuteScalar<int>(existsQuery);
+
+
+            return tableCount > 0;
+        }
+
+        /// <summary>
+        /// Creates a table of entity type T.
+        /// </summary>
+        /// <typeparam name="T">Type of entity</typeparam>
+        /// <param name="connection">Open SqlConnection</param>
+        /// <returns>Returns true if successfull, false if not</returns>
+        public static bool CreateTable<T>(this IDbConnection connection)
+        {
+            var type = typeof(T);
+
+
+            var tableName = GetTableName(type);
+            var sbColumnList = new StringBuilder(null);
+            var allProperties = TypePropertiesCache(type);
+            var keyProperties = KeyPropertiesCache(type);
+            var computedProperties = ComputedPropertiesCache(type);
+            var allPropertiesExceptComputed = allProperties.Except(computedProperties).ToList();
+
+            var adapter = GetFormatter(connection);
+
+            StringBuilder createStatement = new StringBuilder();
+
+            createStatement.Append($"CREATE TABLE {tableName} ");
+
+            if(allProperties.Count > 0)
+            {
+                createStatement.Append("("); // TODO: ANSI SQL Standard for create table?
+                //All follow the ANSI SQL Standard except Firebase
+
+                // Add fields
+                for (var i = 0; i < allPropertiesExceptComputed.Count; i++)
+                {
+                    var prop = allPropertiesExceptComputed[i];
+
+                    // Get the db parameter type
+                    var paramTypeName = adapter.ParameterTypeMap[prop.PropertyType];
+                    var fieldName = adapter.FormatFieldName(prop.Name);
+                    createStatement.Append($"{fieldName} {paramTypeName}");
+
+                    // Special handling for id field
+                    if(prop.Name.ToLower() == "id") 
+                    {
+                        createStatement.Append(adapter.AutoIncrementModifier());
+                    }
+
+                    createStatement.Append(", ");
+
+                }
+
+                // Add constraints
+                createStatement.Append("PRIMARY KEY (");
+
+                for (int i = 0; i < keyProperties.Count; i++)
+                {
+                    createStatement.Append(keyProperties[i].Name);
+                    if(i < keyProperties.Count - 1)
+                    {
+                        createStatement.Append(", ");
+                    }
+                }
+
+                createStatement.Append(" )) ");
+
+                
+                var wasClosed = connection.State == ConnectionState.Closed;
+                if (wasClosed) connection.Open();
+
+                connection.Execute(createStatement.ToString());
+
+                if (wasClosed) connection.Close();
+
+                return true;
+
+            }
+
+
+
+            return false; // Nothing to create
+        }
+
         /// <summary>
         /// Specifies a custom callback that detects the database type instead of relying on the default strategy (the name of the connection type object).
         /// Please note that this callback is global and will be used by all the calls that require a database specific adapter.
@@ -759,6 +855,16 @@ public partial interface ISqlAdapter
     /// <param name="sb">The string builder  to append to.</param>
     /// <param name="columnName">The column name.</param>
     void AppendColumnNameEqualsValue(StringBuilder sb, string columnName);
+
+    /// <summary>
+    /// Maps .NET type to SQL statement parameter type
+    /// </summary>
+    Dictionary<Type, string> ParameterTypeMap { get; }
+
+    string AutoIncrementModifier();
+
+    string FormatFieldName(string propertyName);
+    string GetQuery(string tableName);
 }
 
 /// <summary>
@@ -766,6 +872,26 @@ public partial interface ISqlAdapter
 /// </summary>
 public partial class SqlServerAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap =>
+        new Dictionary<Type, string>()
+        {
+            // TODO Complete map based on: https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-data-type-mappings
+            { typeof(Boolean), "bit" },
+            { typeof(String), "nvarchar(MAX)" },
+            { typeof(Int32), "int" },
+            { typeof(DateTime), "datetime" },
+            { typeof(Char), "char(1)" },
+            { typeof(Decimal), "decimal" },
+            { typeof(Byte), "tinyint" },
+            { typeof(Double), "float" },
+            { typeof(Single), "real" },
+            { typeof(TimeSpan), "time" },
+            { typeof(Guid), "uniqueidentifier" },
+            { typeof(Int16), "smallint" },
+            { typeof(Int64), "bigint" },
+
+        };
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -815,6 +941,21 @@ public partial class SqlServerAdapter : ISqlAdapter
     {
         sb.AppendFormat("[{0}] = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        return " IDENTITY ";
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        return "[" + propertyName + "]";
+    }
+
+    public string GetQuery(string tableName)
+    {
+        return $"select count(*) from sys.tables where Name='{tableName}' and type='U'";
+    }
 }
 
 /// <summary>
@@ -822,6 +963,8 @@ public partial class SqlServerAdapter : ISqlAdapter
 /// </summary>
 public partial class SqlCeServerAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -871,6 +1014,20 @@ public partial class SqlCeServerAdapter : ISqlAdapter
     {
         sb.AppendFormat("[{0}] = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -878,6 +1035,8 @@ public partial class SqlCeServerAdapter : ISqlAdapter
 /// </summary>
 public partial class MySqlAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -926,6 +1085,20 @@ public partial class MySqlAdapter : ISqlAdapter
     {
         sb.AppendFormat("`{0}` = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -933,6 +1106,8 @@ public partial class MySqlAdapter : ISqlAdapter
 /// </summary>
 public partial class PostgresAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -1002,6 +1177,20 @@ public partial class PostgresAdapter : ISqlAdapter
     {
         sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -1009,6 +1198,8 @@ public partial class PostgresAdapter : ISqlAdapter
 /// </summary>
 public partial class SQLiteAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -1055,13 +1246,29 @@ public partial class SQLiteAdapter : ISqlAdapter
     {
         sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
     }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
-/// The Firebase SQL adapeter.
+/// The Firebase SQL adapter.
 /// </summary>
 public partial class FbAdapter : ISqlAdapter
 {
+    public Dictionary<Type, string> ParameterTypeMap => throw new NotImplementedException();
+
     /// <summary>
     /// Inserts <paramref name="entityToInsert"/> into the database, returning the Id of the row created.
     /// </summary>
@@ -1111,5 +1318,19 @@ public partial class FbAdapter : ISqlAdapter
     public void AppendColumnNameEqualsValue(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("{0} = @{1}", columnName, columnName);
+    }
+
+    public string AutoIncrementModifier()
+    {
+        throw new NotImplementedException();
+    }
+
+    public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
     }
 }

@@ -84,6 +84,27 @@ namespace Dapper.Tests.Contrib
         public int Order { get; set; }
     }
 
+    [Table("TestTable")]
+    public class CreateTableTest
+    {
+        public int Id { get; set; }
+        public String Name { get; set; }
+        public Int32 Order { get; set; }
+        public Decimal Decimal_Num { get; set; }
+        public Byte TinyInt { get; set; }
+        public DateTime Date { get; set; }
+        public Char Character { get; set; }
+        public Single Single_Num { get; set; }
+        public TimeSpan Interval { get; set; }
+        public Guid Guid_Attribute { get; set; }
+        public Double Double_Num { get; set; }
+        public Boolean Result { get; set; }
+        public Int16 SmallInt { get; set; }
+        public Int64 BigInt { get; set; }
+
+        // TODO: Full coverage on all supported types
+    }
+
     public abstract partial class TestSuite
     {
         protected static readonly bool IsAppVeyor = Environment.GetEnvironmentVariable("Appveyor")?.ToUpperInvariant() == "TRUE";
@@ -179,7 +200,7 @@ namespace Dapper.Tests.Contrib
 
                 var objectXs = connection.GetAll<ObjectX>().ToList();
                 objectXs.Count.IsMoreThan(0);
-                objectXs.Count(x => x.ObjectXId== guid).IsEqualTo(1);
+                objectXs.Count(x => x.ObjectXId == guid).IsEqualTo(1);
             }
         }
 
@@ -628,6 +649,92 @@ namespace Dapper.Tests.Contrib
                 connection.DeleteAll<User>().IsTrue();
                 connection.Get<User>(id1).IsNull();
                 connection.Get<User>(id2).IsNull();
+            }
+        }
+
+        [Fact]
+        public void CreateTable()
+        {
+            var i = 1;
+
+            i.IsEqualTo(1);
+
+            using (var connection = GetOpenConnection())
+            {
+                connection.TableExists<CreateTableTest>().IsFalse();
+
+                connection.CreateTable<CreateTableTest>().IsTrue();
+
+                connection.TableExists<CreateTableTest>().IsTrue();
+
+
+                var id1 = connection.Insert(new CreateTableTest
+                {
+                    Name = "Bob",
+                    Order = 1,
+                    Decimal_Num = 1.0M,
+                    TinyInt = 255,
+                    Date = new DateTime(2008, 5, 1, 8, 30, 52),
+                    Character = 'c',
+                    Single_Num = 0f,
+                    Interval = TimeSpan.Zero,
+                    Guid_Attribute = Guid.NewGuid(),
+                    Double_Num = 2.5,
+                    Result = true,
+                    SmallInt = 10,
+                    BigInt = 12,
+
+                });
+
+                var id2 = connection.Insert(new CreateTableTest
+                {
+                    Name = "Alice",
+                    Order = 2,
+                    Decimal_Num = 12.0M,
+                    TinyInt = 254,
+                    Date = new DateTime(2016, 5, 1, 8, 30, 52),
+                    Character = 'a',
+                    Single_Num = 4f,
+                    Interval = TimeSpan.Zero,
+                    Guid_Attribute = Guid.NewGuid(),
+                    Double_Num = 3.5,
+                    Result = false,
+                    SmallInt = 12,
+                    BigInt = 14,
+                });
+
+
+                (connection.Get<CreateTableTest>(id1)).Name.IsEqualTo("Bob");
+                (connection.Get<CreateTableTest>(id1)).Order.IsEqualTo(1);
+                (connection.Get<CreateTableTest>(id1)).Decimal_Num.IsEqualTo(1.0M);
+                //(connection.Get<CreateTableTest>(id1)).TinyInt.IsEqualTo(255);
+                (connection.Get<CreateTableTest>(id1)).Date.IsEqualTo(new DateTime(2008, 5, 1, 8, 30, 52));
+                (connection.Get<CreateTableTest>(id1)).Character.IsEqualTo('c');
+                (connection.Get<CreateTableTest>(id1)).Single_Num.IsEqualTo(0f);
+                //(connection.Get<CreateTableTest>(id1)).Interval.IsEqualTo(TimeSpan.Zero);
+                //(connection.Get<CreateTableTest>(id1)).Guid_Attribute.IsEqualTo(Guid.NewGuid());
+                (connection.Get<CreateTableTest>(id1)).Double_Num.IsEqualTo(2.5);
+                (connection.Get<CreateTableTest>(id1)).Result.IsEqualTo(true);
+                //(connection.Get<CreateTableTest>(id1)).SmallInt.IsEqualTo(10);
+                (connection.Get<CreateTableTest>(id1)).BigInt.IsEqualTo(12);
+
+                (connection.Get<CreateTableTest>(id2)).Name.IsEqualTo("Alice");
+                (connection.Get<CreateTableTest>(id2)).Order.IsEqualTo(2);
+                (connection.Get<CreateTableTest>(id2)).Decimal_Num.IsEqualTo(12.0M);
+                //(connection.Get<CreateTableTest>(id1)).TinyInt.IsEqualTo(254);
+                (connection.Get<CreateTableTest>(id2)).Date.IsEqualTo(new DateTime(2016, 5, 1, 8, 30, 52));
+                (connection.Get<CreateTableTest>(id2)).Character.IsEqualTo('a');
+                (connection.Get<CreateTableTest>(id2)).Single_Num.IsEqualTo(4f);
+                //connection.Get<CreateTableTest>(id1)).Interval.IsEqualTo(TimeSpan.Zero);
+                //(connection.Get<CreateTableTest>(id1)).Guid_Attribute.IsEqualTo(Guid.NewGuid());
+                (connection.Get<CreateTableTest>(id2)).Double_Num.IsEqualTo(3.5);
+                (connection.Get<CreateTableTest>(id2)).Result.IsEqualTo(false);
+                //(connection.Get<CreateTableTest>(id1)).SmallInt.IsEqualTo(10);
+                (connection.Get<CreateTableTest>(id2)).BigInt.IsEqualTo(14);
+
+
+                // TODO: Insert and retrieve an object to ensure mapping was successful
+
             }
         }
     }
