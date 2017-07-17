@@ -876,26 +876,19 @@ public partial class SqlServerAdapter : ISqlAdapter
         new Dictionary<Type, string>()
         {
             // TODO Complete map based on: https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-data-type-mappings
-            { typeof(bool), "bit" },
-            { typeof(string), "nvarchar(MAX)" },
-            { typeof(int), "int" },
-            { typeof(byte[]), "binary" },
-            { typeof(DateTime), "datetime2" },
-            { typeof(char), "char(1)" },
-            { typeof(decimal), "decimal" },
-            { typeof(byte[]), "varbinary(max)" },
-            { typeof(double), "float" },
-            { typeof(byte[]), "image" },
-            { typeof(decimal), "money" },
-            { typeof(decimal), "numeric" },
+            { typeof(Boolean), "bit" },
+            { typeof(String), "nvarchar(MAX)" },
+            { typeof(Int32), "int" },
+            { typeof(DateTime), "datetime" },
+            { typeof(Char), "char(1)" },
+            { typeof(Decimal), "decimal" },
+            { typeof(Byte), "tinyint" },
+            { typeof(Double), "float" },
             { typeof(Single), "real" },
-            { typeof(byte[]), "rowversion" },
-            { typeof(string), "text" },
             { typeof(TimeSpan), "time" },
             { typeof(Guid), "uniqueidentifier" },
-            { typeof(byte[]), "varbinary" }//,
-            //{ typeof(XmlDocument), "xml" }
-
+            { typeof(Int16), "smallint" },
+            { typeof(Int64), "bigint" },
 
         };
 
