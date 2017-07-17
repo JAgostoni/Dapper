@@ -90,7 +90,14 @@ namespace Dapper.Tests.Contrib
         public int Id { get; set; }
         public string Name { get; set; }
         public int Order { get; set; }
-
+        public decimal Decimal_Num { get; set; }
+        public byte Byte_Num { get; set; }
+        public DateTime Date { get; set; }
+        public char Character { get; set; }
+        public Single Single_Num { get; set; }
+        public TimeSpan Interval { get; set; }
+        public Guid Guid_Attribute { get; set; }
+        public double Double_Num { get; set; }
 
         // TODO: Full coverage on all supported types
     }
@@ -654,7 +661,42 @@ namespace Dapper.Tests.Contrib
                 connection.TableExists<CreateTableTest>().IsTrue();
 
 
+                var id1 = connection.Insert(new CreateTableTest
+                {
+                    Name = "Bob",
+                    Order = 1,
+                    Decimal_Num = 1.0M,
+                    Byte_Num = 255,
+                    Date = new DateTime(2008, 5, 1, 8, 30, 52),
+                    Character = 'c',
+                    Single_Num = 0f,
+                    Interval = TimeSpan.Zero,
+                    Guid_Attribute = Guid.NewGuid(),
+                    Double_Num = 2.5
+                });
+
+                var id2 = connection.Insert(new CreateTableTest
+                {
+                    Name = "Alice",
+                    Order = 2,
+                    Decimal_Num = 12.0M,
+                    Byte_Num = 254,
+                    Date = new DateTime(2016, 5, 1, 8, 30, 52),
+                    Character = 'a',
+                    Single_Num = 4f,
+                    Interval = TimeSpan.Zero,
+                    Guid_Attribute = Guid.NewGuid(),
+                    Double_Num = 3.5
+                });
+
+                var result1 = connection.Get<CreateTableTest>(id1);
+                result1.Order.IsEqualTo(1);
+
+                var result2 = connection.Get<CreateTableTest>(id2);
+                result2.Order.IsEqualTo(2);
+
                 // TODO: Insert and retrieve an object to ensure mapping was successful
+                //So there aren't any assertions?
 
             }
         }

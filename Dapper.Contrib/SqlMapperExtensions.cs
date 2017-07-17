@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Collections.Concurrent;
 using System.Reflection.Emit;
+using System.Xml;
 
 using Dapper;
 
@@ -496,9 +497,12 @@ namespace Dapper.Contrib.Extensions
 
         public static bool TableExists<T>(this IDbConnection connection)
         {
+
+            var adapter = GetFormatter(connection);
             var tableName = GetTableName(typeof(T));
 
-            var existsQuery = $"select count(*) from sys.tables where Name='{tableName}' and type='U'"; // TODO: Def needs to come from adapter
+            //var existsQuery = $"select count(*) from sys.tables where Name='{tableName}' and type='U'"; // TODO: Def needs to come from adapter
+            var existsQuery = adapter.GetQuery(tableName);
 
             var tableCount = connection.ExecuteScalar<int>(existsQuery);
 
@@ -506,6 +510,12 @@ namespace Dapper.Contrib.Extensions
             return tableCount > 0;
         }
 
+        /// <summary>
+        /// Creates a table of entity type T.
+        /// </summary>
+        /// <typeparam name="T">Type of entity</typeparam>
+        /// <param name="connection">Open SqlConnection</param>
+        /// <returns>Returns true if successfull, false if not</returns>
         public static bool CreateTable<T>(this IDbConnection connection)
         {
             var type = typeof(T);
@@ -527,6 +537,7 @@ namespace Dapper.Contrib.Extensions
             if(allProperties.Count > 0)
             {
                 createStatement.Append("("); // TODO: ANSI SQL Standard for create table?
+                //All follow the ANSI SQL Standard except Firebase
 
                 // Add fields
                 for (var i = 0; i < allPropertiesExceptComputed.Count; i++)
@@ -853,8 +864,7 @@ public partial interface ISqlAdapter
     string AutoIncrementModifier();
 
     string FormatFieldName(string propertyName);
-
-
+    string GetQuery(string tableName);
 }
 
 /// <summary>
@@ -868,7 +878,24 @@ public partial class SqlServerAdapter : ISqlAdapter
             // TODO Complete map based on: https://docs.microsoft.com/en-us/dotnet/framework/data/adonet/sql-server-data-type-mappings
             { typeof(bool), "bit" },
             { typeof(string), "nvarchar(MAX)" },
-            { typeof(int), "int" }
+            { typeof(int), "int" },
+            { typeof(byte[]), "binary" },
+            { typeof(DateTime), "datetime2" },
+            { typeof(char), "char(1)" },
+            { typeof(decimal), "decimal" },
+            { typeof(byte[]), "varbinary(max)" },
+            { typeof(double), "float" },
+            { typeof(byte[]), "image" },
+            { typeof(decimal), "money" },
+            { typeof(decimal), "numeric" },
+            { typeof(Single), "real" },
+            { typeof(byte[]), "rowversion" },
+            { typeof(string), "text" },
+            { typeof(TimeSpan), "time" },
+            { typeof(Guid), "uniqueidentifier" },
+            { typeof(byte[]), "varbinary" }//,
+            //{ typeof(XmlDocument), "xml" }
+
 
         };
 
@@ -930,6 +957,11 @@ public partial class SqlServerAdapter : ISqlAdapter
     public string FormatFieldName(string propertyName)
     {
         return "[" + propertyName + "]";
+    }
+
+    public string GetQuery(string tableName)
+    {
+        return $"select count(*) from sys.tables where Name='{tableName}' and type='U'";
     }
 }
 
@@ -999,6 +1031,10 @@ public partial class SqlCeServerAdapter : ISqlAdapter
     {
         throw new NotImplementedException();
     }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -1063,6 +1099,10 @@ public partial class MySqlAdapter : ISqlAdapter
     }
 
     public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
     {
         throw new NotImplementedException();
     }
@@ -1154,6 +1194,10 @@ public partial class PostgresAdapter : ISqlAdapter
     {
         throw new NotImplementedException();
     }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
@@ -1219,10 +1263,14 @@ public partial class SQLiteAdapter : ISqlAdapter
     {
         throw new NotImplementedException();
     }
+    public string GetQuery(string tableName)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>
-/// The Firebase SQL adapeter.
+/// The Firebase SQL adapter.
 /// </summary>
 public partial class FbAdapter : ISqlAdapter
 {
@@ -1285,6 +1333,10 @@ public partial class FbAdapter : ISqlAdapter
     }
 
     public string FormatFieldName(string propertyName)
+    {
+        throw new NotImplementedException();
+    }
+    public string GetQuery(string tableName)
     {
         throw new NotImplementedException();
     }
