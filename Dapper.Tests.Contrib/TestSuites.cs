@@ -26,11 +26,8 @@ namespace Dapper.Tests.Contrib
 
     public class SqlServerTestSuite : TestSuite
     {
-        private const string DbName = "tempdb";
-        public static string ConnectionString =>
-            IsAppVeyor
-                ? @"Server=(local)\SQL2016;Database=tempdb;User ID=sa;Password=Password12!"
-                : $"Data Source=.;Initial Catalog={DbName};Integrated Security=True";
+        private const string DbName = "test";
+        public static string ConnectionString => @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog = test; Integrated Security = True; Connect Timeout = 30; Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
         public override IDbConnection GetConnection() => new SqlConnection(ConnectionString);
 
         static SqlServerTestSuite()
@@ -56,6 +53,8 @@ namespace Dapper.Tests.Contrib
                 connection.Execute(@"CREATE TABLE ObjectY (ObjectYId int not null, Name nvarchar(100) not null);");
                 dropTable("ObjectZ");
                 connection.Execute(@"CREATE TABLE ObjectZ (Id int not null, Name nvarchar(100) not null);");
+
+                dropTable("TestTable");
             }
         }
     }
