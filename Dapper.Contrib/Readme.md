@@ -18,6 +18,9 @@ bool Update<T>(Enumerable<T> list);
 bool Delete<T>(T obj);
 bool Delete<T>(Enumerable<T> list);
 bool DeleteAll<T>();
+bool TableExists<T>(IDb connection);
+bool CreateTable<T>(IDb connection);
+string GetTableName<T>();
 ```
 
 For these extensions to work, the entity in question _MUST_ have a
@@ -112,6 +115,26 @@ or _ALL_ entities in the table.
 
 ```csharp
 connection.DeleteAll<Car>();
+```
+
+`Table` methods
+-------
+Checks if table exists on current connection
+
+```csharp
+connection.TableExists<T>();
+```
+
+Creates a table on current connection
+
+```csharp
+connection.CreateTable<T>();
+```
+
+Gets the table name
+
+```csharp
+connection.GetTableName();
 ```
 
 Special Attributes

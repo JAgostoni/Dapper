@@ -514,6 +514,7 @@ namespace Dapper.Contrib.Extensions
             return tableCount > 0;
         }
 
+
         /// <summary>
         /// Creates a table of entity type T.
         /// </summary>
@@ -590,6 +591,19 @@ namespace Dapper.Contrib.Extensions
 
 
             return false; // Nothing to create
+        }
+
+        /// <summary>
+        /// Gets the table name of type T
+        /// </summary>
+        /// <returns>A string called tableName</returns>
+        public static string GetTableName<T>()
+        {
+            var type = typeof(T);
+
+            var tableName = GetTableName(type);
+
+            return tableName;
         }
 
         /// <summary>
