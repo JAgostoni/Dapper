@@ -597,7 +597,7 @@ namespace Dapper.Contrib.Extensions
         /// Gets the table name of type T
         /// </summary>
         /// <returns>A string called tableName</returns>
-        public static string GetTableName<T>()
+        public static string GetTableName<T>(this IDbConnection connection)
         {
             var type = typeof(T);
 
